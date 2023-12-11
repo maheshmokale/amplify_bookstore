@@ -11,19 +11,12 @@ import {
   withAuthenticator,
   Image,
 } from "@aws-amplify/ui-react";
-
-import { generateClient } from 'aws-amplify/api';
-import { getProperties } from "aws-amplify/storage";
-
-
 import { listBooks } from "./graphql/queries";
 import {
   createBook as createNoteMutation,
   deleteBook as deleteNoteMutation,
 } from "./graphql/mutations";
-
-
-const client = generateClient();
+import { API, Storage } from "aws-amplify";
 
 const App = ({ signOut }) => {
   const [notes, setNotes] = useState([]);
@@ -33,24 +26,18 @@ const App = ({ signOut }) => {
   }, []);
 
   async function fetchNotes() {
-    const apiData = await client.graphql({ query: listBooks });
-    const length = apiData.data.listBooks.items.length;
-    if (length > 0) {
-      const notesFromAPI = apiData.data.listBooks.items;
-      /* await Promise.all(
-         notesFromAPI.map(async (note) => {
-           if (note.image) {
-             //const url = await Storage.get(note.name);
- 
-             const image = await getProperties(note.name);
-             note.image = image;
-           }
-           return note;
-         })
-       );*/
-      setNotes(notesFromAPI);
-    }
-
+    const apiData = await API.graphql({ query: listBooks });
+    const notesFromAPI = apiData.data.listBooks.items;
+    await Promise.all(
+      notesFromAPI.map(async (note) => {
+        if (note.image) {
+          const url = await Storage.get(note.name);
+          note.image = url;
+        }
+        return note;
+      })
+    );
+    setNotes(notesFromAPI);
   }
 
   async function createNote(event) {
@@ -62,11 +49,11 @@ const App = ({ signOut }) => {
       description: form.get("description"),
       image: image.name,
     };
-    if (!!data.image) //await Storage.put(data.name, image);
-      await client.graphql({
-        query: createNoteMutation,
-        variables: { input: data },
-      });
+    if (!!data.image) await Storage.put(data.name, image);
+    await API.graphql({
+      query: createNoteMutation,
+      variables: { input: data },
+    });
     fetchNotes();
     event.target.reset();
   }
@@ -74,11 +61,11 @@ const App = ({ signOut }) => {
   async function deleteNote({ id, name }) {
     const newNotes = notes.filter((note) => note.id !== id);
     setNotes(newNotes);
-    //await Storage.remove(name);
-    /*await client.graphql({
+    await Storage.remove(name);
+    await API.graphql({
       query: deleteNoteMutation,
       variables: { input: { id } },
-    });*/
+    });
   }
 
   return (
